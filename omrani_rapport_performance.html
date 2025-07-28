@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rapport de Performance - Omrani Ceram</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Earth Tones -->
+    <!-- Application Structure Plan: A single-page dashboard with a sticky navigation bar for quick access to key sections: a high-level KPI summary, a deep-dive into content performance with interactive toggles, an audience analysis, and actionable recommendations in an accordion. This structure is chosen to guide the client from the most impactful results down to the strategic details, making complex data easily digestible and demonstrating clear value. -->
+    <!-- Visualization & Content Choices: Key metrics are shown in bold "KPI cards" for immediate impact. Bar charts (Chart.js) are used to visualize growth comparisons clearly. Donut charts (Chart.js) effectively show proportional data like content/audience breakdowns. An interactive toggle (JS) allows switching between "Posts" and "Reels" data, making the content analysis dynamic and engaging. An accordion (JS) for recommendations keeps the UI clean and focuses the user on one strategic point at a time. This approach turns a static report into an exploratory tool. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #FDFBF6;
+            color: #3C3633;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 350px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .nav-link {
+            transition: color 0.3s, border-bottom-color 0.3s;
+            border-bottom: 2px solid transparent;
+        }
+        .nav-link:hover, .nav-link.active {
+            color: #C08261;
+            border-bottom-color: #C08261;
+        }
+        .kpi-card {
+            background-color: #FFFFFF;
+            border: 1px solid #EFEAE3;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .btn-filter {
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .btn-filter.active {
+            background-color: #C08261;
+            color: #FFFFFF;
+        }
+        .accordion-header {
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .accordion-header:hover {
+            background-color: #F8F4EE;
+        }
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-in-out;
+        }
+        /* Modal styles */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1000; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 700px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            position: relative;
+        }
+        .close-button {
+            color: #aaa;
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: #000;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #C08261;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <header class="bg-white/80 backdrop-blur-lg sticky top-0 z-50 shadow-sm">
+        <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <h1 class="text-xl md:text-2xl font-bold text-[#3C3633]">Omrani Ceram <span class="font-light">| Rapport de Performance</span></h1>
+            <div class="hidden md:flex space-x-8">
+                <a href="#synthese" class="nav-link font-semibold pb-1">Synthèse</a>
+                <a href="#performance" class="nav-link font-semibold pb-1">Performance</a>
+                <a href="#contenu" class="nav-link font-semibold pb-1">Contenu</a>
+                <a href="#audience" class="nav-link font-semibold pb-1">Audience</a>
+                <a href="#recommandations" class="nav-link font-semibold pb-1">Recommandations</a>
+            </div>
+            <div class="md:hidden">
+                <select id="mobile-nav" class="bg-white border border-gray-300 rounded-md p-2">
+                    <option value="#synthese">Synthèse</option>
+                    <option value="#performance">Performance</option>
+                    <option value="#contenu">Contenu</option>
+                    <option value="#audience">Audience</option>
+                    <option value="#recommandations">Recommandations</option>
+                </select>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container mx-auto px-6 py-12">
+
+        <section id="synthese" class="text-center scroll-mt-24">
+            <h2 class="text-3xl md:text-4xl font-bold mb-2">Une Croissance Organique Exceptionnelle</h2>
+            <p class="text-lg text-gray-600 max-w-3xl mx-auto mb-4">Du 10 juin au 25 juillet 2025</p>
+            <p class="max-w-3xl mx-auto mb-12 text-gray-700">Ce rapport interactif détaille les performances exceptionnelles de la stratégie de contenu organique pour Omrani Ceram. En 45 jours, avec 32 publications et 5 Reels, nous avons significativement élargi la portée et l'engagement de la marque, le tout **sans aucun budget publicitaire**. Explorez les sections ci-dessous pour découvrir la valeur concrète générée par ce travail.</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="kpi-card p-6 rounded-lg shadow-md text-center">
+                    <h3 class="text-gray-500 font-semibold">Comptes Touchés</h3>
+                    <p class="text-4xl font-bold my-2">1,569</p>
+                    <p class="text-green-600 font-bold text-xl">▲ +335.8%</p>
+                </div>
+                <div class="kpi-card p-6 rounded-lg shadow-md text-center">
+                    <h3 class="text-gray-500 font-semibold">Vues Totales du Contenu</h3>
+                    <p class="text-4xl font-bold my-2">10,928</p>
+                    <p class="text-gray-400 font-bold text-xl invisible">▲</p>
+                </div>
+                <div class="kpi-card p-6 rounded-lg shadow-md text-center">
+                    <h3 class="text-gray-500 font-semibold">Visites du Profil</h3>
+                    <p class="text-4xl font-bold my-2">432</p>
+                    <p class="text-green-600 font-bold text-xl">▲ +166.7%</p>
+                </div>
+                <div class="kpi-card p-6 rounded-lg shadow-md text-center">
+                    <h3 class="text-gray-500 font-semibold">Interactions Totales</h3>
+                    <p class="text-4xl font-bold my-2">60</p>
+                     <p class="text-gray-400 font-bold text-xl invisible">▲</p>
+                </div>
+            </div>
+        </section>
+
+        <hr class="my-16 border-gray-200">
+
+        <section id="performance" class="scroll-mt-24">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-bold mb-2">Analyse de la Performance Globale</h2>
+                <p class="text-lg text-gray-600 max-w-3xl mx-auto">La croissance n'est pas juste un chiffre, c'est le reflet d'un intérêt grandissant pour la marque.</p>
+            </div>
+            <div class="bg-white p-8 rounded-lg shadow-lg">
+                 <p class="text-center text-gray-700 mb-8">Les graphiques ci-dessous comparent des indicateurs clés entre la période actuelle (10 juin - 25 juillet) et la période précédente (25 avril - 9 juin). Cette comparaison met en évidence l'impact direct de notre stratégie de contenu intensifiée, montrant une accélération spectaculaire de la visibilité et de l'intérêt de l'audience pour Omrani Ceram.</p>
+                <div class="chart-container mx-auto">
+                    <canvas id="growthChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <hr class="my-16 border-gray-200">
+
+        <section id="contenu" class="scroll-mt-24">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-bold mb-2">Analyse Détaillée du Contenu</h2>
+                <p class="text-lg text-gray-600 max-w-3xl mx-auto">Chaque format de contenu a un rôle stratégique. Basculez pour voir la performance des publications et des Reels.</p>
+            </div>
+
+            <div class="flex justify-center mb-8">
+                <div class="bg-gray-200 rounded-full p-1 flex space-x-1">
+                    <button id="btn-posts" class="btn-filter active px-6 py-2 rounded-full font-semibold">Publications</button>
+                    <button id="btn-reels" class="btn-filter px-6 py-2 rounded-full font-semibold">Reels</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center bg-white p-8 rounded-lg shadow-lg">
+                <div class="text-center lg:text-left">
+                    <h3 id="content-title" class="text-2xl font-bold mb-4">Performance des Publications</h3>
+                    <p id="content-description" class="text-gray-700 mb-6">Les publications sont le pilier de notre engagement. Elles génèrent des interactions de haute qualité comme les commentaires et les enregistrements, renforçant la fidélité de notre communauté existante.</p>
+                    <div id="stats-container" class="grid grid-cols-2 gap-4 text-center">
+                        <!-- Stats will be populated by JS -->
+                    </div>
+                    <button id="btn-generate-ideas" class="mt-8 bg-[#C08261] hover:bg-[#A36F50] text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-300">
+                        ✨ Générer des Idées de Contenu
+                    </button>
+                </div>
+                <div class="chart-container">
+                    <canvas id="contentInteractionChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <hr class="my-16 border-gray-200">
+
+        <section id="audience" class="scroll-mt-24">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-bold mb-2">Qui Interagit avec Votre Contenu ?</h2>
+                <p class="text-lg text-gray-600 max-w-3xl mx-auto">Une analyse de l'audience révèle une communauté fidèle et une portée efficace vers de nouveaux clients.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-white p-8 rounded-lg shadow-lg">
+                    <h3 class="text-xl font-bold text-center mb-4">Répartition des Vues</h3>
+                    <p class="text-center text-gray-700 mb-4 h-16">Ce graphique montre que si nos abonnés fidèles constituent la majorité des vues, près d'un quart proviennent de non-abonnés, preuve de notre portée étendue.</p>
+                    <div class="chart-container">
+                        <canvas id="audienceViewsChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-white p-8 rounded-lg shadow-lg">
+                    <h3 class="text-xl font-bold text-center mb-4">Répartition des Interactions</h3>
+                    <p class="text-center text-gray-700 mb-4 h-16">L'engagement provient massivement de vos abonnés. Cela démontre une communauté forte et active, un atout majeur pour la marque.</p>
+                    <div class="chart-container">
+                        <canvas id="audienceInteractionsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <hr class="my-16 border-gray-200">
+
+        <section id="recommandations" class="scroll-mt-24">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-bold mb-2">Recommandations Stratégiques</h2>
+                <p class="text-lg text-gray-600 max-w-3xl mx-auto">Capitalisons sur ces succès. Cliquez sur chaque point pour voir nos suggestions pour l'avenir.</p>
+            </div>
+            <div class="max-w-4xl mx-auto space-y-4">
+                <div class="accordion-item bg-white rounded-lg shadow-lg border border-gray-200">
+                    <div class="accordion-header p-6 flex justify-between items-center">
+                        <h3 class="text-xl font-semibold">Optimiser les Appels à l'Action (CTA)</h3>
+                        <span class="text-2xl font-light transform transition-transform duration-300">▼</span>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="p-6 pt-0 text-gray-700">
+                            <p><strong>Problème :</strong> 432 visites de profil mais 0 clic sur le lien externe. C'est une opportunité manquée.</p>
+                            <p><strong>Solution :</strong> Intégrer des CTA plus clairs et directs dans les légendes ("Lien en bio pour découvrir la collection !") et optimiser le lien en bio pour guider les utilisateurs vers le site web ou le catalogue. Cela transformera l'intérêt en trafic qualifié.</p>
+                        </div>
+                    </div>
+                </div>
+                 <div class="accordion-item bg-white rounded-lg shadow-lg border border-gray-200">
+                    <div class="accordion-header p-6 flex justify-between items-center">
+                        <h3 class="text-xl font-semibold">Affiner le Mix de Contenu Stratégique</h3>
+                        <span class="text-2xl font-light transform transition-transform duration-300">▼</span>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="p-6 pt-0 text-gray-700">
+                            <p><strong>Observation :</strong> Les publications excellent pour l'engagement profond (enregistrements), les Reels pour la portée virale (partages).</p>
+                            <p><strong>Solution :</strong> Continuer d'utiliser les publications pour du contenu de valeur (conseils, inspiration) qui fidélise. Augmenter l'utilisation des Reels pour la découverte, en utilisant des formats courts, dynamiques et des musiques tendances pour atteindre un maximum de non-abonnés.</p>
+                        </div>
+                    </div>
+                </div>
+                 <div class="accordion-item bg-white rounded-lg shadow-lg border border-gray-200">
+                    <div class="accordion-header p-6 flex justify-between items-center">
+                        <h3 class="text-xl font-semibold">Analyser et Répliquer le Succès</h3>
+                        <span class="text-2xl font-light transform transition-transform duration-300">▼</span>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="p-6 pt-0 text-gray-700">
+                           <p><strong>Observation :</strong> Les publications du 12 juin ont eu une performance de vues exceptionnelle.</p>
+                           <p><strong>Solution :</strong> Analyser en détail ces publications : quel était le sujet ? Le format visuel ? L'heure de publication ? En identifiant les ingrédients du succès, nous pouvons les répliquer pour garantir une performance élevée et constante à l'avenir.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="bg-gray-800 text-white mt-16">
+        <div class="container mx-auto px-6 py-4 text-center">
+            <p>&copy; 2025 - Rapport de Performance pour Omrani Ceram. Généré le 26 juillet 2025.</p>
+        </div>
+    </footer>
+
+    <!-- Content Ideas Modal -->
+    <div id="contentIdeasModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 class="text-2xl font-bold mb-4 text-[#3C3633]">Idées de Contenu Générées ✨</h2>
+            <div id="ideas-output" class="text-gray-700">
+                <div class="loading-spinner"></div>
+                <p class="text-center mt-4">Génération des idées en cours...</p>
+            </div>
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    const reportData = {
+        growth: {
+            labels: ['Comptes Touchés', 'Activité du Profil', 'Visites du Profil'],
+            previousPeriod: [360, 163, 162],
+            currentPeriod: [1569, 434, 432]
+        },
+        content: {
+            posts: {
+                title: 'Performance des Publications',
+                description: 'Les publications sont le pilier de notre engagement. Elles génèrent des interactions de haute qualité comme les commentaires et les enregistrements, renforçant la fidélité de notre communauté existante.',
+                interactions: 39,
+                views: 7803,
+                stats: [
+                    { label: 'J\'aime', value: 23 },
+                    { label: 'Commentaires', value: 3 },
+                    { label: 'Enregistrements', value: 8 },
+                    { label: 'Partages', value: 3 }
+                ]
+            },
+            reels: {
+                title: 'Performance des Reels',
+                description: 'Les Reels sont notre moteur de découverte. Leur fort potentiel de partage nous permet d\'atteindre une large audience de non-abonnés et d\'accroître la notoriété de la marque.',
+                interactions: 15,
+                views: 1871,
+                stats: [
+                    { label: 'J\'aime', value: 7 },
+                    { label: 'Partages', value: 6 },
+                    { label: 'Enregistrements', value: 1 },
+                    { label: 'Commentaires', value: 0 }
+                ]
+            }
+        },
+        audience: {
+            views: {
+                labels: ['Abonnés', 'Non-abonnés'],
+                data: [77, 23]
+            },
+            interactions: {
+                labels: ['Abonnés', 'Non-abonnés'],
+                data: [82, 18]
+            }
+        }
+    };
+
+    const chartColors = {
+        primary: '#C08261',
+        secondary: '#E4C59E',
+        text: '#3C3633'
+    };
+
+    Chart.defaults.font.family = "'Poppins', sans-serif";
+    Chart.defaults.color = chartColors.text;
+
+    let contentInteractionChart;
+
+    function createGrowthChart() {
+        const ctx = document.getElementById('growthChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: reportData.growth.labels,
+                datasets: [
+                    {
+                        label: 'Période Précédente',
+                        data: reportData.growth.previousPeriod,
+                        backgroundColor: chartColors.secondary,
+                        borderRadius: 5
+                    },
+                    {
+                        label: 'Période Actuelle',
+                        data: reportData.growth.currentPeriod,
+                        backgroundColor: chartColors.primary,
+                        borderRadius: 5
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: '#EFEAE3'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        backgroundColor: '#FFFFFF',
+                        titleColor: chartColors.text,
+                        bodyColor: chartColors.text,
+                        borderColor: '#EFEAE3',
+                        borderWidth: 1
+                    }
+                }
+            }
+        });
+    }
+
+    function createOrUpdateContentInteractionChart(type = 'posts') {
+        const data = reportData.content[type];
+        const ctx = document.getElementById('contentInteractionChart').getContext('2d');
+        
+        const chartData = {
+            labels: ['Interactions', 'Vues'],
+            datasets: [{
+                label: 'Contribution',
+                data: [data.interactions, data.views],
+                backgroundColor: [chartColors.primary, chartColors.secondary],
+            }]
+        };
+
+        if (contentInteractionChart) {
+            contentInteractionChart.destroy();
+        }
+
+        contentInteractionChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['% des Interactions Totales', '% des Vues Totales'],
+                 datasets: [{
+                    data: [
+                        (type === 'posts' ? 63.9 : 24.6),
+                        (type === 'posts' ? 36.1 : 75.4)
+                    ],
+                    backgroundColor: [chartColors.primary, chartColors.secondary],
+                    borderColor: '#FDFBF6',
+                    borderWidth: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed !== null) {
+                                    label += context.parsed + '%';
+                                }
+                                return label;
+                            }
+                        },
+                        backgroundColor: '#FFFFFF',
+                        titleColor: chartColors.text,
+                        bodyColor: chartColors.text,
+                        borderColor: '#EFEAE3',
+                        borderWidth: 1
+                    }
+                }
+            }
+        });
+    }
+    
+    function updateContentSection(type = 'posts') {
+        const data = reportData.content[type];
+        document.getElementById('content-title').textContent = data.title;
+        document.getElementById('content-description').textContent = data.description;
+        
+        const statsContainer = document.getElementById('stats-container');
+        statsContainer.innerHTML = '';
+        data.stats.forEach(stat => {
+            const statEl = document.createElement('div');
+            statEl.className = 'bg-gray-100 p-4 rounded-lg';
+            statEl.innerHTML = `
+                <p class="text-2xl font-bold">${stat.value}</p>
+                <p class="text-sm text-gray-600">${stat.label}</p>
+            `;
+            statsContainer.appendChild(statEl);
+        });
+
+        createOrUpdateContentInteractionChart(type);
+    }
+
+
+    function createAudienceCharts() {
+        const viewsCtx = document.getElementById('audienceViewsChart').getContext('2d');
+        new Chart(viewsCtx, {
+            type: 'doughnut',
+            data: {
+                labels: reportData.audience.views.labels,
+                datasets: [{
+                    data: reportData.audience.views.data,
+                    backgroundColor: [chartColors.primary, chartColors.secondary],
+                    borderColor: '#FFFFFF',
+                    borderWidth: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => `${context.label}: ${context.parsed}%`
+                        },
+                        backgroundColor: '#FFFFFF',
+                        titleColor: chartColors.text,
+                        bodyColor: chartColors.text,
+                        borderColor: '#EFEAE3',
+                        borderWidth: 1
+                    }
+                }
+            }
+        });
+
+        const interactionsCtx = document.getElementById('audienceInteractionsChart').getContext('2d');
+        new Chart(interactionsCtx, {
+            type: 'doughnut',
+            data: {
+                labels: reportData.audience.interactions.labels,
+                datasets: [{
+                    data: reportData.audience.interactions.data,
+                    backgroundColor: [chartColors.primary, chartColors.secondary],
+                    borderColor: '#FFFFFF',
+                    borderWidth: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => `${context.label}: ${context.parsed}%`
+                        },
+                        backgroundColor: '#FFFFFF',
+                        titleColor: chartColors.text,
+                        bodyColor: chartColors.text,
+                        borderColor: '#EFEAE3',
+                        borderWidth: 1
+                    }
+                }
+            }
+        });
+    }
+
+    async function generateContentIdeas() {
+        const modal = document.getElementById('contentIdeasModal');
+        const ideasOutput = document.getElementById('ideas-output');
+        modal.style.display = 'flex'; // Show modal
+
+        ideasOutput.innerHTML = '<div class="loading-spinner"></div><p class="text-center mt-4">Génération des idées en cours...</p>';
+
+        const postsData = reportData.content.posts;
+        const reelsData = reportData.content.reels;
+
+        const prompt = `En tant que stratège de contenu pour Omrani Ceram, analysez les données suivantes pour la période du 10 juin au 25 juillet 2025 :
+- Posts: ${postsData.interactions} interactions, ${postsData.views} vues (${postsData.stats[0].value} likes, ${postsData.stats[1].value} commentaires, ${postsData.stats[2].value} enregistrements, ${postsData.stats[3].value} partages).
+- Reels: ${reelsData.interactions} interactions, ${reelsData.views} vues (${reelsData.stats[0].value} likes, ${reelsData.stats[1].value} partages, ${reelsData.stats[2].value} enregistrements, ${reelsData.stats[3].value} commentaires).
+Les publications sont efficaces pour l'engagement profond (enregistrements), les Reels pour la portée virale (partages).
+Générez 3-4 idées de contenu originales et créatives pour les publications et 3-4 idées pour les Reels, en tenant compte de ces performances et des objectifs d'une marque de céramique (inspiration, produits, savoir-faire, design d'intérieur). Chaque idée doit inclure un court titre et une brève description. Formatez la réponse avec des titres "Idées pour les Publications" et "Idées pour les Reels", et utilisez des listes à puces pour chaque idée.`;
+
+        try {
+            let chatHistory = [];
+            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+            const payload = { contents: chatHistory };
+            const apiKey = ""; // Leave as-is, Canvas will provide it
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+            if (result.candidates && result.candidates.length > 0 &&
+                result.candidates[0].content && result.candidates[0].content.parts &&
+                result.candidates[0].content.parts.length > 0) {
+                const text = result.candidates[0].content.parts[0].text;
+                ideasOutput.innerHTML = `<div class="prose max-w-none">${marked.parse(text)}</div>`; // Use marked.js for markdown rendering
+            } else {
+                ideasOutput.innerHTML = '<p class="text-red-500 text-center">Erreur: Impossible de générer des idées. Veuillez réessayer.</p>';
+                console.error('Gemini API response structure unexpected:', result);
+            }
+        } catch (error) {
+            ideasOutput.innerHTML = '<p class="text-red-500 text-center">Erreur lors de la connexion à l\'API Gemini. Veuillez vérifier votre connexion ou réessayer plus tard.</p>';
+            console.error('Error calling Gemini API:', error);
+        }
+    }
+
+
+    function setupEventListeners() {
+        const btnPosts = document.getElementById('btn-posts');
+        const btnReels = document.getElementById('btn-reels');
+        const btnGenerateIdeas = document.getElementById('btn-generate-ideas');
+        const modal = document.getElementById('contentIdeasModal');
+        const closeButton = document.querySelector('.close-button');
+
+        btnPosts.addEventListener('click', () => {
+            btnPosts.classList.add('active');
+            btnReels.classList.remove('active');
+            updateContentSection('posts');
+        });
+
+        btnReels.addEventListener('click', () => {
+            btnReels.classList.add('active');
+            btnPosts.classList.remove('active');
+            updateContentSection('reels');
+        });
+
+        btnGenerateIdeas.addEventListener('click', generateContentIdeas);
+
+        closeButton.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        window.addEventListener('click', (event) => {
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        });
+
+
+        document.querySelectorAll('.accordion-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const content = header.nextElementSibling;
+                const icon = header.querySelector('span');
+
+                if (content.style.maxHeight) {
+                    content.style.maxHeight = null;
+                    icon.style.transform = 'rotate(0deg)';
+                } else {
+                    document.querySelectorAll('.accordion-content').forEach(c => c.style.maxHeight = null);
+                    document.querySelectorAll('.accordion-header span').forEach(i => i.style.transform = 'rotate(0deg)');
+                    content.style.maxHeight = content.scrollHeight + "px";
+                    icon.style.transform = 'rotate(180deg)';
+                }
+            });
+        });
+
+        const navLinks = document.querySelectorAll('.nav-link');
+        const sections = document.querySelectorAll('section');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (pageYOffset >= sectionTop - 120) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href').includes(current)) {
+                    link.classList.add('active');
+                }
+            });
+        });
+        
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                document.querySelector(link.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+
+        document.getElementById('mobile-nav').addEventListener('change', function() {
+            document.querySelector(this.value).scrollIntoView({ behavior: 'smooth' });
+        });
+    }
+
+    createGrowthChart();
+    updateContentSection('posts');
+    createAudienceCharts();
+    setupEventListeners();
+});
+</script>
+<!-- Marked.js for Markdown rendering in modal -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</body>
+</html>
